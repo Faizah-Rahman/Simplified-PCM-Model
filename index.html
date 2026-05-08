@@ -1,0 +1,273 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cost Allocation &amp; Margin Model</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+        <link rel="stylesheet" href="styles/app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>Cost Allocation &amp; Margin Model</h1>
+          <p>Inline-editable driver-based allocation model with real-time margin reporting (all monetary values shown in $M)</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="configureModelBtn" class="configure-btn">Configure Model</button>
+          <button id="resetSampleBtn" class="configure-btn">Reset to Sample Inputs</button>
+          <div class="view-toggle" aria-label="View mode">
+            <button type="button" class="view-mode-btn" data-view-mode="single">Single Year</button>
+            <button type="button" class="view-mode-btn" data-view-mode="multi">Multi-Year</button>
+          </div>
+          <button id="addYearBtn" class="configure-btn">+ Add Year</button>
+          <label class="year-control" for="yearSelect">
+            <span>Year</span>
+            <select id="yearSelect"></select>
+          </label>
+          <div class="unit-pill">Unit: $M</div>
+        </div>
+      </header>
+
+      <div id="configOverlay" class="config-overlay">
+        <aside class="config-panel" role="dialog" aria-modal="true" aria-labelledby="configTitle">
+          <div class="config-header">
+            <h3 id="configTitle">Configure Model</h3>
+            <button id="configCloseBtn" class="config-close">Close</button>
+          </div>
+          <div class="config-section">
+            <h4>Orgs</h4>
+            <div class="config-help">Core orgs are protected because they drive Cost of Cloud and margin logic. Add custom orgs for additional OPEX categories.</div>
+            <div id="configOrgList"></div>
+            <div class="config-actions">
+              <button class="configure-btn" data-config-click="add-org">Add Org</button>
+            </div>
+          </div>
+          <div class="config-section">
+            <h4>Accounts</h4>
+            <div class="config-help">Accounts are shared across all orgs. Add, rename, or remove account names here.</div>
+            <div class="config-actions">
+              <button class="configure-btn" data-config-click="add-account">Add Account</button>
+            </div>
+            <div id="configAccountList"></div>
+          </div>
+          <div class="config-help">Defaults are preloaded for demo. You can use the model without opening this panel.</div>
+        </aside>
+      </div>
+
+      <section class="step-nav" id="stepNav"></section>
+      <section class="panel step-meta" id="stepMeta">
+        <h2 id="stepTitle"></h2>
+        <p id="stepDescription"></p>
+        <p id="stepSubtext" class="step-subtext"></p>
+      </section>
+
+      <section class="step-panel active" data-step="0" id="step0Panel">
+        <div class="intro-wrap">
+          <div class="intro-card">
+            <h2>Why this matters</h2>
+            <p>
+              Most businesses have significant operating expenses spread across teams and accounts, but no clear way to understand:
+            </p>
+            <ul class="intro-points">
+              <li>Which products consume those costs</li>
+              <li>Which products are truly profitable</li>
+              <li>Which teams are working on which products</li>
+            </ul>
+            <p>
+              This model allocates that spend logically and reveals product-level margins.
+            </p>
+            <button class="start-btn" id="startModelBtn">Start Model</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="step-panel" data-step="1" id="step1Panel">
+        <div class="kpi-grid" id="step1Totals"></div>
+        <div class="two-col">
+          <section class="panel">
+            <h2>Revenue by Product ($M)</h2>
+            <div class="table-wrap" id="revenueTableWrap"><table id="revenueTable"></table></div>
+          </section>
+          <section class="panel">
+            <h2>N&E ARR by Product ($M)</h2>
+            <div class="table-wrap" id="arrTableWrap"><table id="arrTable"></table></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="step-panel" data-step="2" id="step2Panel">
+        <section class="panel">
+          <div class="driver-panel-head">
+            <h2>Allocation Drivers</h2>
+            <div class="driver-scope-row">
+              <span class="driver-scope-label">Driver Scope:</span>
+              <div class="driver-mode-toggle" aria-label="Driver scope">
+                <button type="button" class="driver-mode-btn" data-driver-mode="shared">Apply to all years</button>
+                <button type="button" class="driver-mode-btn" data-driver-mode="perYear">Customize per year</button>
+              </div>
+            </div>
+          </div>
+          <div class="drivers-grid" id="driversGrid"></div>
+        </section>
+      </section>
+
+      <section class="step-panel" data-step="3" id="step3Panel">
+        <section class="panel">
+          <h2>Detailed OPEX Breakdown ($M)</h2>
+          <div class="table-wrap">
+            <table class="opex-breakdown-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Ops Hosting</th>
+                  <th>SaaS Support</th>
+                  <th>Cost of Cloud</th>
+                  <th>Dev</th>
+                  <th>Sales</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>ERE</td>
+                  <td>$4.0</td>
+                  <td>$12.5</td>
+                  <td>$16.5</td>
+                  <td>$20.0</td>
+                  <td>$10.0</td>
+                  <td>$46.5</td>
+                </tr>
+                <tr>
+                  <td>Commission</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td>$10.0</td>
+                  <td>$10.0</td>
+                </tr>
+                <tr>
+                  <td>OCI</td>
+                  <td>$12.0</td>
+                  <td>$0.5</td>
+                  <td>$12.5</td>
+                  <td>$3.0</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td>$15.5</td>
+                </tr>
+                <tr>
+                  <td>CVD</td>
+                  <td>$2.5</td>
+                  <td>$1.0</td>
+                  <td>$3.5</td>
+                  <td>$5.0</td>
+                  <td>$1.0</td>
+                  <td>$9.5</td>
+                </tr>
+                <tr>
+                  <td>Ext Contractor/Prof Fees</td>
+                  <td>$1.0</td>
+                  <td>$1.0</td>
+                  <td>$2.0</td>
+                  <td>$1.0</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td>$3.0</td>
+                </tr>
+                <tr>
+                  <td>Other</td>
+                  <td>$0.5</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td>$0.5</td>
+                  <td>$1.0</td>
+                  <td class="empty-value">&ndash;</td>
+                  <td>$1.5</td>
+                </tr>
+                <tr class="opex-breakdown-total">
+                  <td>Total</td>
+                  <td>$20.0</td>
+                  <td>$15.0</td>
+                  <td>$35.0</td>
+                  <td>$30.0</td>
+                  <td>$21.0</td>
+                  <td>$86.0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel opex-summary-panel">
+          <h2>Total OPEX by Function ($M)</h2>
+          <div id="opexSummary"></div>
+        </section>
+        <section class="panel">
+          <h2>OPEX by Function + Account + Allocation Driver ($M)</h2>
+          <div class="panel-helper">Enter OPEX by function and account. These values drive all allocations.</div>
+          <div class="panel-helper">Cost of Cloud = Ops Hosting + SaaS Support</div>
+          <div id="opexFunctionGroups"></div>
+        </section>
+      </section>
+
+      <section class="step-panel" data-step="4" id="step4Panel">
+        <section class="panel financial-panel">
+          <h2>Margin by Product ($M)</h2>
+          <div class="table-wrap"><table id="marginTable"></table></div>
+        </section>
+        <section class="panel">
+          <h2>Margin Insights</h2>
+          <div class="insight-flow">
+            <div class="insight-card">
+              <h3>Revenue to Contribution Margin Bridge ($M)</h3>
+              <p class="insight-subtitle">Shows where revenue is consumed before contribution margin.</p>
+              <div class="insight-chart" id="waterfallChart"></div>
+            </div>
+            <div class="insight-card">
+              <h3>Product Portfolio Performance</h3>
+              <p class="insight-subtitle">Bubble size represents contribution margin dollars.</p>
+              <div class="insight-chart" id="portfolioScatter"></div>
+            </div>
+            <div class="insight-grid">
+              <div class="insight-card">
+                <h3>Cost Structure as % of Revenue</h3>
+                <p class="insight-subtitle">Sorted by contribution margin%; retained margin shown for tie-out.</p>
+                <div id="costStructureChart"></div>
+              </div>
+              <div class="insight-card">
+                <h3>Contribution Margin per $1 of Revenue</h3>
+                <p class="insight-subtitle">Highlights products retaining less than $0.20 per $1 revenue.</p>
+                <div id="retainedDollarChart"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="step-panel" data-step="5" id="step5Panel">
+        <section class="panel financial-panel">
+          <div class="financial-report-header">
+            <h2>Product Financial Report</h2>
+            <div class="report-download-actions">
+              <button id="downloadReportBtn" class="configure-btn" type="button">Download Report (Excel)</button>
+              <button id="downloadPdfBtn" class="configure-btn" type="button">Download Report (PDF)</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="reportTable"></table>
+          </div>
+        </section>
+      </section>
+
+      <section class="step-controls" id="stepControls">
+        <button id="backBtn" class="nav-btn">Back</button>
+        <button id="nextBtn" class="nav-btn">Next</button>
+      </section>
+    </div>
+
+        <script src="scripts/app.js"></script>
+  </body>
+</html>
+
+
